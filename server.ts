@@ -17,6 +17,9 @@ import {
   registerSseClient,
   connectMongo,
   getStorageUsage,
+  getCloudImages,
+  saveCloudImages,
+  deleteCloudImage,
 } from './api/_lib/cloudStore.ts';
 
 dotenv.config();
@@ -186,6 +189,36 @@ app.get('/api/cloud/storage-usage', async (_req, res) => {
   } catch (err) {
     console.error('[API] /api/cloud/storage-usage error:', err);
     return res.status(500).json({ ok: false, error: 'Failed to calculate storage usage' });
+  }
+});
+
+app.get('/api/cloud/images', async (_req, res) => {
+  try {
+    return res.json({ ok: true, images: await getCloudImages() });
+  } catch (err) {
+    return res.status(503).json({ ok: false, error: err instanceof Error ? err.message : 'Image storage unavailable' });
+  }
+});
+
+app.post('/api/cloud/images', async (req, res) => {
+  try {
+    const images = Array.isArray(req.body?.images) ? req.body.images : [];
+    if (images.some((image: any) => !image?.id || !image?.dataUrl || typeof image.dataUrl !== 'string')) {
+      return res.status(400).json({ ok: false, error: 'Invalid image payload' });
+    }
+    await saveCloudImages(images);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(503).json({ ok: false, error: err instanceof Error ? err.message : 'Image storage unavailable' });
+  }
+});
+
+app.delete('/api/cloud/images/:id', async (req, res) => {
+  try {
+    await deleteCloudImage(req.params.id);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(503).json({ ok: false, error: err instanceof Error ? err.message : 'Image storage unavailable' });
   }
 });
 

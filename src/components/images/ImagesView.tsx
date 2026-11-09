@@ -54,7 +54,32 @@ const openDatabase = () =>
     request.onerror = () => reject(request.error);
   });
 
+const dataUrlToBlob = (dataUrl: string) => {
+  const [header, body] = dataUrl.split(',', 2);
+  const bytes = Uint8Array.from(atob(body || ''), (char) => char.charCodeAt(0));
+  return new Blob([bytes], { type: header.match(/data:(.*?);/)?.[1] || 'application/octet-stream' });
+};
+
+const imageToCloud = async (image: StoredImage) => ({
+  ...image,
+  dataUrl: await blobToDataUrl(image.blob),
+  blob: undefined,
+});
+
 export const readImages = async (): Promise<StoredImage[]> => {
+  try {
+    const response = await fetch('/api/cloud/images');
+    if (response.ok) {
+      const payload = await response.json();
+      if (payload.ok && Array.isArray(payload.images)) {
+        return payload.images.map((image: any) => ({
+          id: String(image.id), name: String(image.name), type: String(image.type),
+          size: Number(image.size), originalSize: image.originalSize ? Number(image.originalSize) : undefined,
+          createdAt: Number(image.createdAt), blob: dataUrlToBlob(String(image.dataUrl)),
+        }));
+      }
+    }
+  } catch {}
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
@@ -64,6 +89,13 @@ export const readImages = async (): Promise<StoredImage[]> => {
 };
 
 export const writeImages = async (images: StoredImage[]) => {
+  try {
+    const response = await fetch('/api/cloud/images', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ images: await Promise.all(images.map(imageToCloud)) }),
+    });
+    if (response.ok) return;
+  } catch {}
   const db = await openDatabase();
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
@@ -75,6 +107,10 @@ export const writeImages = async (images: StoredImage[]) => {
 };
 
 export const removeImage = async (id: string) => {
+  try {
+    const response = await fetch(`/api/cloud/images/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (response.ok) return;
+  } catch {}
   const db = await openDatabase();
   return new Promise<void>((resolve, reject) => {
     const request = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(id);

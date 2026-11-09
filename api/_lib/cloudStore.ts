@@ -226,6 +226,42 @@ export async function getVaultData(): Promise<CloudVaultData & { isMongoConnecte
 }
 
 /** Storage included with the MongoDB Atlas free tier (M0). */
+export interface CloudImage {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  originalSize?: number;
+  createdAt: number;
+  dataUrl: string;
+}
+
+export async function getCloudImages(): Promise<CloudImage[]> {
+  if (!isInitialized) await initCloudStore();
+  if (!mongoDb) return [];
+  const docs = await mongoDb.collection<CloudImage>('gallery_images').find({}).sort({ createdAt: -1 }).toArray();
+  return docs.map(({ _id: _ignored, ...image }) => image);
+}
+
+export async function saveCloudImages(images: CloudImage[]): Promise<void> {
+  if (!isInitialized) await initCloudStore();
+  if (!mongoDb) throw new Error('MongoDB Atlas is not connected');
+  const collection = mongoDb.collection<CloudImage>('gallery_images');
+  if (images.length === 0) {
+    await collection.deleteMany({});
+    return;
+  }
+  await collection.bulkWrite(images.map((image) => ({
+    replaceOne: { filter: { id: image.id }, replacement: image, upsert: true },
+  })));
+}
+
+export async function deleteCloudImage(id: string): Promise<void> {
+  if (!isInitialized) await initCloudStore();
+  if (!mongoDb) throw new Error('MongoDB Atlas is not connected');
+  await mongoDb.collection<CloudImage>('gallery_images').deleteOne({ id });
+}
+
 export const MONGO_FREE_PLAN_LIMIT_BYTES = 512 * 1024 * 1024;
 
 export interface StorageUsageEntry {
@@ -266,6 +302,14 @@ export async function getStorageUsage(): Promise<StorageUsage> {
     { label: 'Watchlist', bytes: jsonBytes(data.media), count: data.media.length },
     { label: 'Settings', bytes: jsonBytes(data.settings), count: 1 },
   ];
+
+  if (mongoDb) {
+    const imageStats = await mongoDb.collection('gallery_images').aggregate([
+      { $group: { _id: null, bytes: { $sum: '$size' }, count: { $sum: 1 } } },
+    ]).toArray();
+    const imageUsage = imageStats[0];
+    breakdown.push({ label: 'Images', bytes: Number(imageUsage?.bytes || 0), count: Number(imageUsage?.count || 0) });
+  }
 
   let usedBytes = breakdown.reduce((sum, entry) => sum + entry.bytes, 0);
   let measuredBy: StorageUsage['measuredBy'] = 'vault-document';

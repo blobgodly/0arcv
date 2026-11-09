@@ -59,7 +59,8 @@ const parseCookies = (header = '') => Object.fromEntries(header.split(';').map((
 
 const loginPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>0arc — Private Access</title><style>body{margin:0;background:#09090b;color:#fafafa;font:14px system-ui;display:grid;place-items:center;min-height:100vh}main{width:min(360px,calc(100% - 40px));padding:28px;border:1px solid #27272a;border-radius:16px;background:#111113}h1{font-size:18px;margin:0 0 8px}p{color:#a1a1aa;font-size:12px;margin:0 0 20px}input,button{width:100%;box-sizing:border-box;padding:11px 12px;border-radius:9px;border:1px solid #3f3f46;background:#09090b;color:#fff;font:inherit}button{margin-top:10px;background:#fff;color:#09090b;border:0;font-weight:600;cursor:pointer}#error{color:#f87171;margin-top:12px;min-height:16px}</style></head><body><main><h1>Private archive</h1><p>This site is restricted. Enter the access password to continue.</p><form id="form"><input id="password" type="password" autocomplete="current-password" aria-label="Access password" required><button>Unlock archive</button><div id="error" role="alert"></div></form></main><script>form.addEventListener('submit',async(e)=>{e.preventDefault();error.textContent='';const r=await fetch('/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:password.value})});if(r.ok)location.reload();else error.textContent='Incorrect password.'})</script></body></html>`;
 
-app.use(express.json({ limit: '15mb' }));
+// MongoDB documents are limited to 16 MB; keep base64 payloads below that ceiling.
+app.use(express.json({ limit: '16mb' }));
 
 app.post('/api/auth/login', (req, res) => {
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
@@ -261,6 +262,9 @@ app.post('/api/cloud/images', async (req, res) => {
     const images = Array.isArray(req.body?.images) ? req.body.images : [];
     if (images.some((image: any) => !image?.id || !image?.dataUrl || typeof image.dataUrl !== 'string')) {
       return res.status(400).json({ ok: false, error: 'Invalid image payload' });
+    }
+    if (images.some((image: any) => !Number.isFinite(Number(image.size)) || Number(image.size) > 10 * 1024 * 1024)) {
+      return res.status(413).json({ ok: false, error: 'Each image must be 10 MB or smaller.' });
     }
     await saveCloudImages(images);
     return res.json({ ok: true });

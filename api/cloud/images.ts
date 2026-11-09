@@ -12,6 +12,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       if (images.some((image) => !image || typeof image !== 'object' || !(image as any).id || !(image as any).dataUrl)) {
         return res.status(400).json({ ok: false, error: 'Invalid image payload' });
       }
+      if (images.some((image) => !Number.isFinite(Number((image as any).size)) || Number((image as any).size) > 10 * 1024 * 1024)) {
+        return res.status(413).json({ ok: false, error: 'Each image must be 10 MB or smaller.' });
+      }
       await saveCloudImages(images as any[]);
       return res.status(200).json({ ok: true });
     }

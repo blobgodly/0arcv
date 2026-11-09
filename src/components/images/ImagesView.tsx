@@ -40,6 +40,7 @@ export type GalleryExportImage = {
 const DB_NAME = '0arc-image-gallery';
 const STORE_NAME = 'images';
 const ACCEPTED_IMAGES = 'image/*,.avif,.bmp,.gif,.heic,.heif,.jpeg,.jpg,.png,.svg,.tif,.tiff,.webp';
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 const createId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
@@ -283,6 +284,11 @@ export const ImagesView: React.FC = () => {
         })
       );
 
+      const oversized = prepared.filter((image) => image.size > MAX_IMAGE_BYTES);
+      if (oversized.length) {
+        throw new Error(`${oversized.length} image${oversized.length === 1 ? '' : 's'} exceed the 10 MB upload limit.`);
+      }
+
       await writeImages(prepared);
       await refreshImages();
 
@@ -308,9 +314,10 @@ export const ImagesView: React.FC = () => {
             : 'Added to image archive'
         );
       }
-    } catch {
-      setError('Could not save images. Please check your storage settings.');
-      addToast('Upload Failed', 'error', 'Failed to store image in gallery.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'MongoDB image storage is unavailable.';
+      setError(message);
+      addToast('Upload Failed', 'error', message);
     }
   };
 

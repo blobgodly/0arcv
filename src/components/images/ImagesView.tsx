@@ -79,13 +79,10 @@ export const readImages = async (): Promise<StoredImage[]> => {
         }));
       }
     }
-  } catch {}
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
-    request.onsuccess = () => resolve((request.result as StoredImage[]).sort((a, b) => b.createdAt - a.createdAt));
-    request.onerror = () => reject(request.error);
-  });
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'MongoDB image storage unavailable');
+  }
+  throw new Error('MongoDB image storage unavailable');
 };
 
 export const writeImages = async (images: StoredImage[]) => {
@@ -95,28 +92,20 @@ export const writeImages = async (images: StoredImage[]) => {
       body: JSON.stringify({ images: await Promise.all(images.map(imageToCloud)) }),
     });
     if (response.ok) return;
-  } catch {}
-  const db = await openDatabase();
-  return new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    images.forEach((image) => store.put(image));
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'MongoDB image storage unavailable');
+  }
+  throw new Error('MongoDB image storage unavailable');
 };
 
 export const removeImage = async (id: string) => {
   try {
     const response = await fetch(`/api/cloud/images/${encodeURIComponent(id)}`, { method: 'DELETE' });
     if (response.ok) return;
-  } catch {}
-  const db = await openDatabase();
-  return new Promise<void>((resolve, reject) => {
-    const request = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'MongoDB image storage unavailable');
+  }
+  throw new Error('MongoDB image storage unavailable');
 };
 
 export const formatSize = (bytes: number) => {

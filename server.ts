@@ -8,6 +8,7 @@
  */
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
+import crypto from 'node:crypto';
 import dotenv from 'dotenv';
 import { lookupMedia, resolveMediaDetails, searchImdb, type MediaKind } from './api/_lib/media.ts';
 import {
@@ -26,8 +27,63 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const ACCESS_PASSWORD = process.env.APP_ACCESS_PASSWORD || '';
+const SESSION_SECRET = process.env.APP_SESSION_SECRET || crypto.createHash('sha256').update(ACCESS_PASSWORD || crypto.randomBytes(32)).digest('hex');
+const SESSION_TTL_SECONDS = 60 * 60 * 12;
+
+const constantTimeEqual = (left: string, right: string) => {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+};
+
+const signSession = (expiresAt: number) => {
+  const payload = `${expiresAt}`;
+  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+};
+
+const hasValidSession = (value: string | undefined) => {
+  if (!value) return false;
+  const [expiresAtText, signature] = value.split('.');
+  const expiresAt = Number(expiresAtText);
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= Date.now() || !signature) return false;
+  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(expiresAtText).digest('base64url');
+  return constantTimeEqual(signature, expected);
+};
+
+const parseCookies = (header = '') => Object.fromEntries(header.split(';').map((part) => {
+  const index = part.indexOf('=');
+  return index < 0 ? ['', ''] : [part.slice(0, index).trim(), decodeURIComponent(part.slice(index + 1).trim())];
+}).filter(([key]) => key));
+
+const loginPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>0arc — Private Access</title><style>body{margin:0;background:#09090b;color:#fafafa;font:14px system-ui;display:grid;place-items:center;min-height:100vh}main{width:min(360px,calc(100% - 40px));padding:28px;border:1px solid #27272a;border-radius:16px;background:#111113}h1{font-size:18px;margin:0 0 8px}p{color:#a1a1aa;font-size:12px;margin:0 0 20px}input,button{width:100%;box-sizing:border-box;padding:11px 12px;border-radius:9px;border:1px solid #3f3f46;background:#09090b;color:#fff;font:inherit}button{margin-top:10px;background:#fff;color:#09090b;border:0;font-weight:600;cursor:pointer}#error{color:#f87171;margin-top:12px;min-height:16px}</style></head><body><main><h1>Private archive</h1><p>This site is restricted. Enter the access password to continue.</p><form id="form"><input id="password" type="password" autocomplete="current-password" aria-label="Access password" required><button>Unlock archive</button><div id="error" role="alert"></div></form></main><script>form.addEventListener('submit',async(e)=>{e.preventDefault();error.textContent='';const r=await fetch('/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:password.value})});if(r.ok)location.reload();else error.textContent='Incorrect password.'})</script></body></html>`;
 
 app.use(express.json({ limit: '15mb' }));
+
+app.post('/api/auth/login', (req, res) => {
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!ACCESS_PASSWORD || !constantTimeEqual(password, ACCESS_PASSWORD)) {
+    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+  }
+  const expiresAt = Date.now() + SESSION_TTL_SECONDS * 1000;
+  res.setHeader('Set-Cookie', `arc_session=${signSession(expiresAt)}; Max-Age=${SESSION_TTL_SECONDS}; Path=/; HttpOnly; SameSite=Strict${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`);
+  return res.json({ ok: true });
+});
+
+app.post('/api/auth/logout', (_req, res) => {
+  res.setHeader('Set-Cookie', 'arc_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict');
+  return res.json({ ok: true });
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/auth/')) return next();
+  const cookies = parseCookies(req.headers.cookie);
+  if (hasValidSession(cookies.arc_session)) return next();
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.path.startsWith('/api/')) return res.status(401).json({ ok: false, error: 'Authentication required' });
+  return res.status(401).type('html').send(loginPage);
+});
 
 // Initialize persistent storage engine on startup
 initCloudStore().catch((err) => {

@@ -63,52 +63,19 @@ export async function initCloudStore(): Promise<CloudVaultData> {
   // This supports Vercel serverless functions and local dev env hot reloads.
   activeMongoUri = process.env.MONGODB_URI || activeMongoUri;
 
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-
-    if (fs.existsSync(DATA_FILE)) {
-      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-      const parsed = JSON.parse(raw);
-      cachedVault = {
-        tools: Array.isArray(parsed.tools) ? parsed.tools : [],
-        notes: Array.isArray(parsed.notes) ? parsed.notes : [],
-        media: Array.isArray(parsed.media) ? parsed.media : [],
-        settings: parsed.settings || INITIAL_DATA.settings,
-        version: typeof parsed.version === 'number' ? parsed.version : 1,
-        updatedAt: parsed.updatedAt || new Date().toISOString(),
-      };
-    } else {
-      // First run: save initial empty vault
-      saveToDisk(cachedVault);
-    }
-  } catch (err) {
-    console.error('[CloudStore] Error initializing from disk:', err);
+  if (!activeMongoUri) {
+    throw new Error('MongoDB Atlas is required; local vault storage is disabled.');
   }
 
-  // Try connecting to MongoDB if URI is set
-  if (activeMongoUri) {
-    await connectMongo(activeMongoUri).catch((err) => {
-      console.warn('[CloudStore] Initial MongoDB connect failed (will use persistent cloud file):', err?.message);
-    });
-  }
+  await connectMongo(activeMongoUri);
+  if (!mongoDb) throw new Error('MongoDB Atlas connection could not be established.');
 
   isInitialized = true;
   return cachedVault;
 }
 
-function saveToDisk(data: CloudVaultData): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    const tempFile = `${DATA_FILE}.tmp.${Date.now()}`;
-    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
-    fs.renameSync(tempFile, DATA_FILE);
-  } catch (err) {
-    console.error('[CloudStore] Error saving vault to disk:', err);
-  }
+function saveToDisk(_data: CloudVaultData): void {
+  // Intentionally disabled: MongoDB Atlas is the only persistence layer.
 }
 
 /**

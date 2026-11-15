@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { ArchiveProvider, useArchive } from './context/ArchiveContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { MobileNav } from './components/layout/MobileNav';
@@ -12,6 +12,7 @@ import { GlobalSearchModal } from './components/common/GlobalSearchModal';
 import { QuickAddModal } from './components/common/QuickAddModal';
 import { ToastContainer } from './components/common/ToastContainer';
 import { OverviewView } from './components/overview/OverviewView';
+const AIChatView = lazy(() => import('./components/ai/AIChatView').then(({ AIChatView }) => ({ default: AIChatView })));
 import { ToolsView } from './components/tools/ToolsView';
 import { NotesView } from './components/notes/NotesView';
 import { WatchlistView } from './components/watchlist/WatchlistView';
@@ -26,6 +27,12 @@ const MainContent: React.FC = () => {
     switch (activeTab) {
       case 'overview':
         return <OverviewView />;
+      case 'ai':
+        return (
+          <Suspense fallback={<div className="p-8 text-center text-sm text-zinc-500">Loading AI assistant…</div>}>
+            <AIChatView />
+          </Suspense>
+        );
       case 'favorites':
         return <FavoritesView />;
       case 'tools':

@@ -10,6 +10,7 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { lookupMedia, resolveMediaDetails, searchImdb, type MediaKind } from './api/_lib/media.ts';
+import { allowAiRequest, respondToArchiveChat } from './api/_lib/aiChat.ts';
 import {
   initCloudStore,
   getVaultData,
@@ -32,6 +33,31 @@ app.use(express.json({ limit: '16mb' }));
 // Initialize persistent storage engine on startup
 initCloudStore().catch((err) => {
   console.error('[0arc] Failed to initialize cloud storage:', err);
+});
+
+// -------------------------------------------------------------
+// AI archive assistant
+// -------------------------------------------------------------
+
+app.post('/api/ai/chat', async (req, res) => {
+  const clientKey = req.ip || 'unknown';
+  if (!allowAiRequest(clientKey)) {
+    return res.status(429).json({ ok: false, error: 'Too many requests. Please wait a minute and try again.' });
+  }
+  try {
+    const reply = await respondToArchiveChat(req.body?.message, req.body?.history);
+    return res.json({ ok: true, reply });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.startsWith('Enter a message') || message.startsWith('Messages must')) {
+      return res.status(400).json({ ok: false, error: message });
+    }
+    if (message.includes('not configured')) {
+      return res.status(503).json({ ok: false, error: message });
+    }
+    console.error('[AI Chat] Request failed:', error);
+    return res.status(502).json({ ok: false, error: 'The AI service is temporarily unavailable. Please try again shortly.' });
+  }
 });
 
 // -------------------------------------------------------------

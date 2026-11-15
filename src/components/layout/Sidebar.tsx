@@ -3,6 +3,7 @@ import { useArchive } from '../../context/ArchiveContext';
 import { NavigationTab } from '../../types';
 import {
   LayoutDashboard,
+  MessageSquareText,
   Wrench,
   FileText,
   Film,
@@ -16,6 +17,7 @@ export const Sidebar: React.FC = () => {
 
   const navItems: { id: NavigationTab; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { id: 'ai', label: 'AI', icon: <MessageSquareText className="w-4 h-4" /> },
     { id: 'tools', label: 'Tools', icon: <Wrench className="w-4 h-4" /> },
     { id: 'notes', label: 'Notes', icon: <FileText className="w-4 h-4" /> },
     { id: 'watchlist', label: 'Watchlist', icon: <Film className="w-4 h-4" /> },

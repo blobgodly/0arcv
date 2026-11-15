@@ -1,5 +1,5 @@
 import type { ApiRequest, ApiResponse } from '../_lib/http.js';
-import { allowAiRequest, respondToArchiveChat } from '../_lib/aiChat.js';
+import { allowAiRequest, getAiServiceError, respondToArchiveChat } from '../_lib/aiChat.js';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
@@ -20,6 +20,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       return res.status(503).json({ ok: false, error: message });
     }
     console.error('[AI Chat] Request failed:', error);
-    return res.status(502).json({ ok: false, error: 'The AI service is temporarily unavailable. Please try again shortly.' });
+    const serviceError = getAiServiceError(error);
+    return res.status(serviceError.status).json({ ok: false, error: serviceError.message });
   }
 }

@@ -1,6 +1,10 @@
 {
   "framework": "vite",
   "outputDirectory": "dist",
+  "proxy": {
+    "entrypoint": "proxy.ts",
+    "matcher": ["/(.*)"]
+  },
   "rewrites": [
     {
       "source": "/((?!api/).*)",

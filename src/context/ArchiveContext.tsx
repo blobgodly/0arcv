@@ -110,6 +110,17 @@ const generateUUID = (): string => {
   });
 };
 
+const optimizePosterUrl = (url: string): string => {
+  if (!url) return url;
+  return url
+    .replace('/w92/', '/w342/')
+    .replace('/w154/', '/w342/')
+    .replace('/w185/', '/w342/')
+    .replace('/w342/', '/w342/')
+    .replace('/w500/', '/w342/')
+    .replace('/w780/', '/w500/');
+};
+
 const normalizeMediaStatus = (status?: string): MediaStatus => {
   switch (status) {
     case 'watching':
@@ -136,12 +147,15 @@ const normalizeMediaItems = (items: unknown): MediaItem[] => {
       id: String(item.id || generateUUID()),
       title: String(item.title || 'Untitled'),
       type: item.type === 'series' || item.type === 'anime' ? item.type : 'movie',
-      posterUrl:
-        typeof item.posterUrl === 'string'
-          ? item.posterUrl
-          : typeof item.poster_url === 'string'
-            ? item.poster_url
-            : undefined,
+      posterUrl: (() => {
+        const poster =
+          typeof item.posterUrl === 'string'
+            ? item.posterUrl
+            : typeof item.poster_url === 'string'
+              ? item.poster_url
+              : '';
+        return poster ? optimizePosterUrl(poster) : undefined;
+      })(),
       description: String(item.description || ''),
       genre: String(item.genre || ''),
       releaseYear: Number(item.releaseYear || item.release_year) || new Date().getFullYear(),

@@ -176,7 +176,7 @@ export const WatchlistView: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {filteredMedia.map((item) => {
+          {filteredMedia.map((item, index) => {
             return (
               <div
                 key={item.id}
@@ -196,7 +196,9 @@ export const WatchlistView: React.FC = () => {
                     <img
                       src={item.posterUrl}
                       alt={item.title}
-                      loading="lazy"
+                      loading={index < 4 ? 'eager' : 'lazy'}
+                      decoding="async"
+                      fetchPriority={index < 2 ? 'high' : 'auto'}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />

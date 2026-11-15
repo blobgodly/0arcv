@@ -184,7 +184,7 @@ export const OverviewView: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {currentlyConsumingMedia.map((m) => {
+            {currentlyConsumingMedia.map((m, index) => {
 
               return (
                 <div
@@ -196,6 +196,9 @@ export const OverviewView: React.FC = () => {
                       <img
                         src={m.posterUrl}
                         alt={m.title}
+                        loading={index < 4 ? 'eager' : 'lazy'}
+                        decoding="async"
+                        fetchPriority={index < 2 ? 'high' : 'auto'}
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />

@@ -99,12 +99,10 @@ export const AIChatView: React.FC = () => {
       <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5 sm:px-8 sm:py-8" aria-live="polite" aria-relevant="additions text">
         {messages.length === 0 ? (
           <div className="mx-auto flex min-h-[46vh] max-w-xl flex-col items-center justify-center text-center">
-            <div className="mb-5 flex h-14 w-14 items-center justify-center text-white" aria-label="0arc logo">
-              <span className="font-mono text-5xl font-semibold leading-none">0</span>
-            </div>
+            <Sparkles className="mb-5 h-7 w-7 text-zinc-200" aria-label="AI assistant" />
             <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">How can I help?</h1>
             <p className="mt-3 max-w-lg text-sm leading-6 text-zinc-400">
-              Ask about your archive or the wider web. I can read tools, notes, and watchlist entries, find current sources, and propose adding or editing items. Nothing changes until you approve it. Gemini processes archive entries; Google Search gets only your request.
+              Ask about anything online or in your archive. I can search the web, read your saved items, and suggest ideas.
             </p>
           </div>
         ) : (

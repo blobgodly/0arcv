@@ -10,6 +10,8 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { lookupMedia, resolveMediaDetails, searchImdb, type MediaKind } from './api/_lib/media.ts';
+import { allowAiRequest, applyArchiveChange, getAiServiceError, respondToArchiveChat } from './api/_lib/aiChat.ts';
+import { allowLoginAttempt, clearSessionCookie, createSessionCookie, hasValidSessionCookie, privateLoginPage, verifyAccessPassword } from './api/_lib/auth.ts';
 import {
   initCloudStore,
   getVaultData,
@@ -25,13 +27,84 @@ import {
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT) || 3000;
-// MongoDB documents are limited to 16 MB; keep base64 payloads below that ceiling.
+
 app.use(express.json({ limit: '16mb' }));
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (process.env.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=63072000');
+  next();
+});
+
+app.post('/api/auth/login', (req, res) => {
+  if (!allowLoginAttempt(req.ip || 'unknown')) return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
+  const password = typeof req.body?.password === 'string' && req.body.password.length <= 1024 ? req.body.password : '';
+  if (!verifyAccessPassword(password)) return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Set-Cookie', createSessionCookie());
+  return res.json({ ok: true });
+});
+
+app.post('/api/auth/logout', (_req, res) => {
+  res.setHeader('Set-Cookie', clearSessionCookie());
+  return res.json({ ok: true });
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/auth/')) return next();
+  if (hasValidSessionCookie(req.headers.cookie)) return next();
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.path.startsWith('/api/')) return res.status(401).json({ ok: false, error: 'Authentication required' });
+  return res.status(401).type('html').send(privateLoginPage);
+});
 
 // Initialize persistent storage engine on startup
 initCloudStore().catch((err) => {
   console.error('[0arc] Failed to initialize cloud storage:', err);
+});
+
+// -------------------------------------------------------------
+// AI archive assistant
+// -------------------------------------------------------------
+
+app.post('/api/ai/apply', async (req, res) => {
+  const clientKey = req.ip || 'unknown';
+  if (!allowAiRequest(clientKey)) {
+    return res.status(429).json({ ok: false, error: 'Too many requests. Please wait and try again.' });
+  }
+  try {
+    return res.json(await applyArchiveChange(req.body?.proposal));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'The proposed change could not be applied.';
+    const status = /proposal|invalid|expired|field|title|target|choose|url|rating|tags|year/i.test(message) ? 400 : 500;
+    return res.status(status).json({ ok: false, error: message });
+  }
+});
+
+app.post('/api/ai/chat', async (req, res) => {
+  const clientKey = req.ip || 'unknown';
+  if (!allowAiRequest(clientKey)) {
+    return res.status(429).json({ ok: false, error: 'Too many requests. Please wait a minute and try again.' });
+  }
+  try {
+    const reply = await respondToArchiveChat(req.body?.message, req.body?.history);
+    return res.json({ ok: true, reply });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.startsWith('Enter a message') || message.startsWith('Messages must')) {
+      return res.status(400).json({ ok: false, error: message });
+    }
+    if (message.includes('not configured')) {
+      return res.status(503).json({ ok: false, error: message });
+    }
+    console.error('[AI Chat] Request failed:', error);
+    const serviceError = getAiServiceError(error);
+    return res.status(serviceError.status).json({ ok: false, error: serviceError.message });
+  }
 });
 
 // -------------------------------------------------------------

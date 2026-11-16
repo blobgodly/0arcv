@@ -9,6 +9,7 @@ import { NavigationTab } from '../types';
  */
 export const TAB_PATHS: Record<NavigationTab, string> = {
   overview: '/',
+  ai: '/ai',
   tools: '/tools',
   notes: '/notes',
   watchlist: '/watchlist',
@@ -19,6 +20,7 @@ export const TAB_PATHS: Record<NavigationTab, string> = {
 
 export const TAB_TITLES: Record<NavigationTab, string> = {
   overview: 'Overview',
+  ai: 'AI',
   tools: 'Tools',
   notes: 'Notes',
   watchlist: 'Watchlist',
@@ -29,6 +31,7 @@ export const TAB_TITLES: Record<NavigationTab, string> = {
 
 const PATH_TO_TAB: Record<string, NavigationTab> = {
   '/': 'overview',
+  '/ai': 'ai',
   '/tools': 'tools',
   '/notes': 'notes',
   '/watchlist': 'watchlist',

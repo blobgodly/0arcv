@@ -64,6 +64,7 @@ export interface MediaItem {
 
 export type NavigationTab =
   | 'overview'
+  | 'ai'
   | 'tools'
   | 'notes'
   | 'watchlist'

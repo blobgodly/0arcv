@@ -46,13 +46,21 @@ jobs:
       - name: Initialize or Sync Capacitor iOS
         run: |
           echo "=== Capacitor Info ==="
-          npx cap --version
+          npx cap --version || true
           if [ ! -d "ios" ]; then
-            echo "Adding iOS platform via Capacitor (without automatic pod install)..."
-            npx cap add ios --no-pod-install
+            echo "Adding iOS platform via Capacitor..."
+            npx cap add ios 2>&1 | tee /tmp/cap_add.log || {
+              MSG=$(tail -n 20 /tmp/cap_add.log | tr '\n' ' ')
+              echo "::error title=Capacitor Add Failed::$MSG"
+              exit 1
+            }
           fi
           echo "Syncing Capacitor plugins and assets..."
-          npx cap sync ios --no-pod-install
+          npx cap sync ios 2>&1 | tee /tmp/cap_sync.log || {
+            MSG=$(tail -n 20 /tmp/cap_sync.log | tr '\n' ' ')
+            echo "::error title=Capacitor Sync Failed::$MSG"
+            exit 1
+          }
 
       - name: Configure iOS ATS & App Properties
         run: |

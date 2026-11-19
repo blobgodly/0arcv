@@ -14,12 +14,11 @@ export const Header: React.FC = () => {
 
   const breadcrumbLabels: Record<string, { title: string; count?: number }> = {
     overview: { title: 'Overview', count: tools.length + notes.length + media.length },
-    ai: { title: 'AI Assistant' },
     favorites: { title: 'Favorites' },
     tools: { title: 'Tools & Resources', count: tools.length },
     notes: { title: 'Notes', count: notes.length },
     watchlist: { title: 'Watchlist', count: media.length },
-    images: { title: 'Images' },
+    files: { title: 'Files' },
     settings: { title: 'Settings' },
   };
 

@@ -1,15 +1,9 @@
 {
   "framework": "vite",
   "outputDirectory": "dist",
-  "proxy": {
-    "entrypoint": "proxy.ts",
-    "matcher": ["/(.*)"]
-  },
   "rewrites": [
     { "source": "/api/auth/login", "destination": "/api/auth?action=login" },
     { "source": "/api/auth/logout", "destination": "/api/auth?action=logout" },
-    { "source": "/api/ai/chat", "destination": "/api/ai?action=chat" },
-    { "source": "/api/ai/apply", "destination": "/api/ai?action=apply" },
     { "source": "/api/imdb/search", "destination": "/api/media?provider=imdb&action=search" },
     { "source": "/api/imdb/details", "destination": "/api/media?provider=imdb&action=details" },
     { "source": "/api/gemini/media-lookup", "destination": "/api/media?provider=gemini&action=lookup" },

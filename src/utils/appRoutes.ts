@@ -9,33 +9,31 @@ import { NavigationTab } from '../types';
  */
 export const TAB_PATHS: Record<NavigationTab, string> = {
   overview: '/',
-  ai: '/ai',
   tools: '/tools',
   notes: '/notes',
   watchlist: '/watchlist',
-  images: '/images',
+  files: '/files',
   favorites: '/favorites',
   settings: '/',
 };
 
 export const TAB_TITLES: Record<NavigationTab, string> = {
   overview: 'Overview',
-  ai: 'AI',
   tools: 'Tools',
   notes: 'Notes',
   watchlist: 'Watchlist',
-  images: 'Images',
+  files: 'Files',
   favorites: 'Favorites',
   settings: 'Settings',
 };
 
 const PATH_TO_TAB: Record<string, NavigationTab> = {
   '/': 'overview',
-  '/ai': 'ai',
   '/tools': 'tools',
   '/notes': 'notes',
   '/watchlist': 'watchlist',
-  '/images': 'images',
+  '/files': 'files',
+  '/images': 'files',
   '/favorites': 'favorites',
 };
 

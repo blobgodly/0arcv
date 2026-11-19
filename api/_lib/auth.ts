@@ -44,6 +44,7 @@ function signSession(expiresAt: number) {
 }
 
 export function hasValidSessionCookie(cookieHeader: string | undefined) {
+  if (!ACCESS_PASSWORD) return true;
   const value = readCookie(cookieHeader, 'arc_session');
   if (!value) return false;
   const [expiresAtText, signature] = value.split('.');

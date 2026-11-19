@@ -234,9 +234,14 @@ export const ArchiveProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const routedTab = tabFromPath(window.location.pathname);
       if (routedTab) return routedTab;
     }
-    const fallback = settings.defaultArchiveView;
-    // Settings has no URL of its own, so a launch page can never be Settings.
-    return fallback && fallback !== 'settings' ? fallback : 'overview';
+    const rawFallback = settings.defaultArchiveView as string;
+    const fallback: NavigationTab =
+      rawFallback === 'images'
+        ? 'files'
+        : rawFallback === 'ai' || rawFallback === 'settings' || !rawFallback
+          ? 'overview'
+          : (rawFallback as NavigationTab);
+    return fallback;
   });
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [quickAddModalOpen, setQuickAddModalOpen] = useState(false);

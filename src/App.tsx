@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { lazy, Suspense } from 'react';
+import React from 'react';
 import { ArchiveProvider, useArchive } from './context/ArchiveContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { MobileNav } from './components/layout/MobileNav';
@@ -12,11 +12,10 @@ import { GlobalSearchModal } from './components/common/GlobalSearchModal';
 import { QuickAddModal } from './components/common/QuickAddModal';
 import { ToastContainer } from './components/common/ToastContainer';
 import { OverviewView } from './components/overview/OverviewView';
-const AIChatView = lazy(() => import('./components/ai/AIChatView').then(({ AIChatView }) => ({ default: AIChatView })));
 import { ToolsView } from './components/tools/ToolsView';
 import { NotesView } from './components/notes/NotesView';
 import { WatchlistView } from './components/watchlist/WatchlistView';
-import { ImagesView } from './components/images/ImagesView';
+import { FilesView } from './components/files/FilesView';
 import { FavoritesView } from './components/unified/FavoritesView';
 import { SettingsView } from './components/settings/SettingsView';
 
@@ -27,12 +26,6 @@ const MainContent: React.FC = () => {
     switch (activeTab) {
       case 'overview':
         return <OverviewView />;
-      case 'ai':
-        return (
-          <Suspense fallback={<div className="p-8 text-center text-sm text-zinc-500">Loading AI assistant…</div>}>
-            <AIChatView />
-          </Suspense>
-        );
       case 'favorites':
         return <FavoritesView />;
       case 'tools':
@@ -41,8 +34,8 @@ const MainContent: React.FC = () => {
         return <NotesView />;
       case 'watchlist':
         return <WatchlistView />;
-      case 'images':
-        return <ImagesView />;
+      case 'files':
+        return <FilesView />;
       case 'settings':
         return <SettingsView />;
       default:

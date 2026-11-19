@@ -291,7 +291,7 @@ export const SettingsView: React.FC = () => {
               <option value="tools">Tools & Resources</option>
               <option value="notes">Personal Notes</option>
               <option value="watchlist">Watchlist</option>
-              <option value="images">Images</option>
+              <option value="files">Files</option>
               <option value="favorites">Favorites</option>
             </select>
           </div>

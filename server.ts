@@ -10,7 +10,6 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { lookupMedia, resolveMediaDetails, searchImdb, type MediaKind } from './api/_lib/media.ts';
-import { allowAiRequest, applyArchiveChange, getAiServiceError, respondToArchiveChat } from './api/_lib/aiChat.ts';
 import { allowLoginAttempt, clearSessionCookie, createSessionCookie, hasValidSessionCookie, privateLoginPage, verifyAccessPassword } from './api/_lib/auth.ts';
 import {
   initCloudStore,
@@ -22,6 +21,9 @@ import {
   getCloudImages,
   saveCloudImages,
   deleteCloudImage,
+  getCloudFiles,
+  saveCloudFiles,
+  deleteCloudFile,
 } from './api/_lib/cloudStore.ts';
 
 dotenv.config();
@@ -30,11 +32,10 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json({ limit: '16mb' }));
+app.use(express.json({ limit: '32mb' }));
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   if (process.env.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=63072000');
   next();
@@ -68,47 +69,7 @@ initCloudStore().catch((err) => {
 });
 
 // -------------------------------------------------------------
-// AI archive assistant
-// -------------------------------------------------------------
-
-app.post('/api/ai/apply', async (req, res) => {
-  const clientKey = req.ip || 'unknown';
-  if (!allowAiRequest(clientKey)) {
-    return res.status(429).json({ ok: false, error: 'Too many requests. Please wait and try again.' });
-  }
-  try {
-    return res.json(await applyArchiveChange(req.body?.proposal));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'The proposed change could not be applied.';
-    const status = /proposal|invalid|expired|field|title|target|choose|url|rating|tags|year/i.test(message) ? 400 : 500;
-    return res.status(status).json({ ok: false, error: message });
-  }
-});
-
-app.post('/api/ai/chat', async (req, res) => {
-  const clientKey = req.ip || 'unknown';
-  if (!allowAiRequest(clientKey)) {
-    return res.status(429).json({ ok: false, error: 'Too many requests. Please wait a minute and try again.' });
-  }
-  try {
-    const reply = await respondToArchiveChat(req.body?.message, req.body?.history);
-    return res.json({ ok: true, reply });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (message.startsWith('Enter a message') || message.startsWith('Messages must')) {
-      return res.status(400).json({ ok: false, error: message });
-    }
-    if (message.includes('not configured')) {
-      return res.status(503).json({ ok: false, error: message });
-    }
-    console.error('[AI Chat] Request failed:', error);
-    const serviceError = getAiServiceError(error);
-    return res.status(serviceError.status).json({ ok: false, error: serviceError.message });
-  }
-});
-
-// -------------------------------------------------------------
-// IMDb & Gemini Media APIs
+// IMDb & Media APIs
 // -------------------------------------------------------------
 
 app.get('/api/imdb/search', async (req, res) => {
@@ -295,6 +256,39 @@ app.delete('/api/cloud/images/:id', async (req, res) => {
     return res.json({ ok: true });
   } catch (err) {
     return res.status(503).json({ ok: false, error: err instanceof Error ? err.message : 'Image storage unavailable' });
+  }
+});
+
+app.get('/api/cloud/files', async (_req, res) => {
+  try {
+    return res.json({ ok: true, files: await getCloudFiles() });
+  } catch (err) {
+    return res.status(503).json({ ok: false, error: err instanceof Error ? err.message : 'File storage unavailable' });
+  }
+});
+
+app.post('/api/cloud/files', async (req, res) => {
+  try {
+    const files = Array.isArray(req.body?.files) ? req.body.files : [];
+    if (files.some((file: any) => !file?.id || !file?.name || !file?.dataUrl || typeof file.dataUrl !== 'string')) {
+      return res.status(400).json({ ok: false, error: 'Invalid file payload' });
+    }
+    if (files.some((file: any) => !Number.isFinite(Number(file.size)) || Number(file.size) > 10 * 1024 * 1024)) {
+      return res.status(413).json({ ok: false, error: 'Each file must be 10 MB or smaller.' });
+    }
+    await saveCloudFiles(files);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(503).json({ ok: false, error: err instanceof Error ? err.message : 'File storage unavailable' });
+  }
+});
+
+app.delete('/api/cloud/files/:id', async (req, res) => {
+  try {
+    await deleteCloudFile(req.params.id);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(503).json({ ok: false, error: err instanceof Error ? err.message : 'File storage unavailable' });
   }
 });
 

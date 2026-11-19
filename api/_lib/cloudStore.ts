@@ -53,29 +53,62 @@ let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
 let activeMongoUri: string = process.env.MONGODB_URI || '';
 
+// In-memory fallback for gallery images and general files when MongoDB is offline
+let memoryImages: CloudImage[] = [];
+let memoryFiles: CloudFile[] = [];
+
 /**
  * Ensure storage directory and load persisted vault data from disk or MongoDB.
  */
 export async function initCloudStore(): Promise<CloudVaultData> {
   if (isInitialized) return cachedVault;
 
-  // Read the injected Atlas URI at request time as well as module load time.
-  // This supports Vercel serverless functions and local dev env hot reloads.
-  activeMongoUri = process.env.MONGODB_URI || activeMongoUri;
-
-  if (!activeMongoUri) {
-    throw new Error('MongoDB Atlas is required; local vault storage is disabled.');
+  // Load local vault seed/snapshot if present on disk
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        if (Array.isArray(parsed.tools)) cachedVault.tools = parsed.tools;
+        if (Array.isArray(parsed.notes)) cachedVault.notes = parsed.notes;
+        if (Array.isArray(parsed.media)) cachedVault.media = parsed.media;
+        if (parsed.settings && typeof parsed.settings === 'object') {
+          cachedVault.settings = { ...cachedVault.settings, ...parsed.settings };
+        }
+        if (typeof parsed.version === 'number') cachedVault.version = parsed.version;
+        if (typeof parsed.updatedAt === 'string') cachedVault.updatedAt = parsed.updatedAt;
+      }
+    }
+  } catch (err) {
+    console.warn('[CloudStore] Could not read local vault file, using default state:', err);
   }
 
-  await connectMongo(activeMongoUri);
-  if (!mongoDb) throw new Error('MongoDB Atlas connection could not be established.');
+  // Read the injected Atlas URI at request time as well as module load time.
+  activeMongoUri = process.env.MONGODB_URI || activeMongoUri;
+
+  if (activeMongoUri) {
+    const res = await connectMongo(activeMongoUri);
+    if (!res.ok) {
+      console.warn('[CloudStore] MongoDB not connected — using in-memory/local fallback:', res.message);
+    }
+  } else {
+    console.warn('[CloudStore] MONGODB_URI not configured — using in-memory/local fallback.');
+  }
 
   isInitialized = true;
   return cachedVault;
 }
 
-function saveToDisk(_data: CloudVaultData): void {
-  // Intentionally disabled: MongoDB Atlas is the only persistence layer.
+function saveToDisk(data: CloudVaultData): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const { mongoUri: _ignored, ...safeData } = data;
+    fs.writeFileSync(DATA_FILE, JSON.stringify(safeData, null, 2), 'utf-8');
+  } catch {
+    // Ephemeral or read-only filesystem — keep in-memory cache
+  }
 }
 
 /**
@@ -205,14 +238,23 @@ export interface CloudImage {
 
 export async function getCloudImages(): Promise<CloudImage[]> {
   if (!isInitialized) await initCloudStore();
-  if (!mongoDb) return [];
+  if (!mongoDb) return [...memoryImages].sort((a, b) => b.createdAt - a.createdAt);
   const docs = await mongoDb.collection<CloudImage>('gallery_images').find({}).sort({ createdAt: -1 }).toArray();
   return docs.map(({ _id: _ignored, ...image }) => image);
 }
 
 export async function saveCloudImages(images: CloudImage[]): Promise<void> {
   if (!isInitialized) await initCloudStore();
-  if (!mongoDb) throw new Error('MongoDB Atlas is not connected');
+  if (!mongoDb) {
+    if (images.length === 0) {
+      memoryImages = [];
+      return;
+    }
+    const byId = new Map(memoryImages.map((img) => [img.id, img]));
+    for (const img of images) byId.set(img.id, img);
+    memoryImages = Array.from(byId.values());
+    return;
+  }
   const collection = mongoDb.collection<CloudImage>('gallery_images');
   if (images.length === 0) {
     await collection.deleteMany({});
@@ -225,8 +267,58 @@ export async function saveCloudImages(images: CloudImage[]): Promise<void> {
 
 export async function deleteCloudImage(id: string): Promise<void> {
   if (!isInitialized) await initCloudStore();
-  if (!mongoDb) throw new Error('MongoDB Atlas is not connected');
+  if (!mongoDb) {
+    memoryImages = memoryImages.filter((img) => img.id !== id);
+    return;
+  }
   await mongoDb.collection<CloudImage>('gallery_images').deleteOne({ id });
+}
+
+export interface CloudFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  createdAt: number;
+  dataUrl: string;
+}
+
+export async function getCloudFiles(): Promise<CloudFile[]> {
+  if (!isInitialized) await initCloudStore();
+  if (!mongoDb) return [...memoryFiles].sort((a, b) => b.createdAt - a.createdAt);
+  const docs = await mongoDb.collection<CloudFile>('vault_files').find({}).sort({ createdAt: -1 }).toArray();
+  return docs.map(({ _id: _ignored, ...file }) => file);
+}
+
+export async function saveCloudFiles(files: CloudFile[]): Promise<void> {
+  if (!isInitialized) await initCloudStore();
+  if (!mongoDb) {
+    if (files.length === 0) {
+      memoryFiles = [];
+      return;
+    }
+    const byId = new Map(memoryFiles.map((file) => [file.id, file]));
+    for (const file of files) byId.set(file.id, file);
+    memoryFiles = Array.from(byId.values());
+    return;
+  }
+  const collection = mongoDb.collection<CloudFile>('vault_files');
+  if (files.length === 0) {
+    await collection.deleteMany({});
+    return;
+  }
+  await collection.bulkWrite(files.map((file) => ({
+    replaceOne: { filter: { id: file.id }, replacement: file, upsert: true },
+  })));
+}
+
+export async function deleteCloudFile(id: string): Promise<void> {
+  if (!isInitialized) await initCloudStore();
+  if (!mongoDb) {
+    memoryFiles = memoryFiles.filter((file) => file.id !== id);
+    return;
+  }
+  await mongoDb.collection<CloudFile>('vault_files').deleteOne({ id });
 }
 
 export const MONGO_FREE_PLAN_LIMIT_BYTES = 512 * 1024 * 1024;
@@ -276,6 +368,18 @@ export async function getStorageUsage(): Promise<StorageUsage> {
     ]).toArray();
     const imageUsage = imageStats[0];
     breakdown.push({ label: 'Images', bytes: Number(imageUsage?.bytes || 0), count: Number(imageUsage?.count || 0) });
+
+    const fileStats = await mongoDb.collection('vault_files').aggregate([
+      { $group: { _id: null, bytes: { $sum: '$size' }, count: { $sum: 1 } } },
+    ]).toArray();
+    const fileUsage = fileStats[0];
+    breakdown.push({ label: 'Files', bytes: Number(fileUsage?.bytes || 0), count: Number(fileUsage?.count || 0) });
+  } else {
+    const imageBytes = memoryImages.reduce((sum, img) => sum + Number(img.size || 0), 0);
+    breakdown.push({ label: 'Images', bytes: imageBytes, count: memoryImages.length });
+
+    const fileBytes = memoryFiles.reduce((sum, file) => sum + Number(file.size || 0), 0);
+    breakdown.push({ label: 'Files', bytes: fileBytes, count: memoryFiles.length });
   }
 
   let usedBytes = breakdown.reduce((sum, entry) => sum + entry.bytes, 0);

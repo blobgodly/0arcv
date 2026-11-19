@@ -430,19 +430,23 @@ export const ImagesView: React.FC = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-start sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.06]">
-        <div>
-          <h1 className="text-xl font-semibold text-white tracking-tight">Images</h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            {images.length} {images.length === 1 ? 'image' : 'images'} saved in your private reference archive.
-          </p>
+      {/* Single toolbar row */}
+      <div className="flex items-center gap-2.5">
+        <div className="relative flex-1 min-w-0">
+          <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="search"
+            placeholder="Search images..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-white/[0.2]"
+          />
         </div>
 
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-medium transition-colors shrink-0 shadow-sm"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-medium transition-colors shrink-0"
         >
           <ImagePlus className="w-3.5 h-3.5" />
           <span>Add Images</span>
@@ -455,33 +459,6 @@ export const ImagesView: React.FC = () => {
           {error}
         </div>
       )}
-
-      {/* Search & Sort Controls */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-        <div className="relative flex-1 min-w-0">
-          <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="search"
-            placeholder="Search saved images by filename..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 sm:py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-white/[0.2]"
-          />
-        </div>
-
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as any)}
-          className={selectClass}
-          aria-label="Sort images"
-        >
-          <option value="recent">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="name">Name (A–Z)</option>
-          <option value="size_desc">Size (Largest)</option>
-          <option value="size_asc">Size (Smallest)</option>
-        </select>
-      </div>
 
       {/* Loading State */}
       {isLoading && (

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useArchive } from '../../context/ArchiveContext';
+import { getApiUrl } from '../../utils/apiConfig';
 import {
   Upload,
   Search,
@@ -52,7 +53,7 @@ const dataUrlToBlob = (dataUrl: string, fallbackType?: string) => {
 };
 
 const readCloudFiles = async (): Promise<StoredFile[]> => {
-  const response = await fetch('/api/cloud/files');
+  const response = await fetch(getApiUrl('/api/cloud/files'));
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || 'File storage unavailable');
@@ -82,7 +83,7 @@ const writeCloudFiles = async (files: StoredFile[]) => {
       dataUrl: await blobToDataUrl(file.blob),
     }))
   );
-  const response = await fetch('/api/cloud/files', {
+  const response = await fetch(getApiUrl('/api/cloud/files'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ files: serialized }),
@@ -94,7 +95,7 @@ const writeCloudFiles = async (files: StoredFile[]) => {
 };
 
 const removeCloudFile = async (id: string) => {
-  const response = await fetch(`/api/cloud/files/${encodeURIComponent(id)}`, {
+  const response = await fetch(getApiUrl(`/api/cloud/files/${encodeURIComponent(id)}`), {
     method: 'DELETE',
   });
   if (!response.ok) {

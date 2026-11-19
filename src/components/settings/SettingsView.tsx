@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { NavigationTab } from '../../types';
 import { fetchStorageUsage, type StorageUsage } from '../../utils/cloudSync';
+import { getCustomServerUrl, setCustomServerUrl } from '../../utils/apiConfig';
 
 const FREE_PLAN_LIMIT_BYTES = 512 * 1024 * 1024;
 
@@ -61,6 +62,20 @@ export const SettingsView: React.FC = () => {
 
   // Storage allowance against the MongoDB Atlas free plan
   const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null);
+
+  // Custom backend / MongoDB server URL state (for iOS native & cross-device)
+  const [serverUrl, setServerUrl] = useState(getCustomServerUrl());
+  const [serverSaved, setServerSaved] = useState(false);
+
+  const handleSaveServerUrl = () => {
+    setCustomServerUrl(serverUrl);
+    setServerSaved(true);
+    addToast('Backend Server URL saved', 'success', 'App will now connect to this server');
+    setTimeout(() => {
+      setServerSaved(false);
+      window.location.reload();
+    }, 1200);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -202,6 +217,39 @@ export const SettingsView: React.FC = () => {
           <div className="shrink-0 text-right">
             <p className="text-[11px] font-mono text-zinc-300">Automatic background saving</p>
             <p className="text-[10px] text-zinc-500 mt-0.5">MongoDB Atlas</p>
+          </div>
+        </div>
+
+        {/* Remote Server / MongoDB Connection Endpoint for iOS */}
+        <div className="surface-card rounded-xl p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <p className="text-xs font-medium text-white">Cloud Backend / MongoDB Server Endpoint</p>
+            <span className="text-[10px] font-mono text-zinc-400">Essential for iOS standalone app</span>
+          </div>
+          <p className="text-[11px] text-zinc-400">
+            Enter your hosted 0arc backend URL (e.g. on Railway, Render, Fly.io, or VPS). When set, the iOS app automatically syncs all tools, notes, media, and files directly to your MongoDB database.
+          </p>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+            <input
+              type="url"
+              placeholder="https://your-0arc-server.up.railway.app"
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              className="flex-1 bg-zinc-900 border border-zinc-700/60 rounded-lg px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/40 font-mono"
+            />
+            <button
+              onClick={handleSaveServerUrl}
+              className="px-4 py-2 bg-white text-zinc-950 font-semibold text-xs rounded-lg hover:bg-zinc-200 transition-colors shrink-0 flex items-center justify-center gap-1.5"
+            >
+              {serverSaved ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  Saved
+                </>
+              ) : (
+                'Save & Connect'
+              )}
+            </button>
           </div>
         </div>
       </div>

@@ -3,6 +3,8 @@
  * Handles communication with the backend cloud store and real-time SSE updates.
  */
 
+import { getApiUrl } from './apiConfig';
+
 export interface CloudVaultPayload {
   tools: any[];
   notes: any[];
@@ -46,7 +48,7 @@ export interface StorageUsage {
  */
 export async function fetchStorageUsage(): Promise<StorageUsage | null> {
   try {
-    const res = await fetch('/api/cloud/storage-usage');
+    const res = await fetch(getApiUrl('/api/cloud/storage-usage'));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = (await res.json()) as StorageUsage;
     if (json.ok === false) return null;
@@ -65,7 +67,7 @@ export async function fetchCloudVault(): Promise<{
   error?: string;
 }> {
   try {
-    const res = await fetch('/api/cloud/data');
+    const res = await fetch(getApiUrl('/api/cloud/data'));
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
     }
@@ -95,7 +97,7 @@ export async function pushCloudVault(
   }
 ): Promise<{ ok: boolean; version?: number; error?: string }> {
   try {
-    const res = await fetch('/api/cloud/sync', {
+    const res = await fetch(getApiUrl('/api/cloud/sync'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -126,7 +128,7 @@ export async function pushCloudVault(
  */
 export async function fetchMongoStatus(): Promise<MongoStatus> {
   try {
-    const res = await fetch('/api/cloud/mongo-status');
+    const res = await fetch(getApiUrl('/api/cloud/mongo-status'));
     if (!res.ok) throw new Error('Status check failed');
     return await res.json();
   } catch {
@@ -144,7 +146,7 @@ export async function fetchMongoStatus(): Promise<MongoStatus> {
  */
 export async function setMongoConnection(uri: string): Promise<{ ok: boolean; message?: string }> {
   try {
-    const res = await fetch('/api/cloud/mongo-config', {
+    const res = await fetch(getApiUrl('/api/cloud/mongo-config'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ uri }),
@@ -175,7 +177,7 @@ export function setupRealtimeSync(
     if (isClosed) return;
 
     try {
-      eventSource = new EventSource(`/api/cloud/events?clientId=${encodeURIComponent(clientId)}`);
+      eventSource = new EventSource(getApiUrl(`/api/cloud/events?clientId=${encodeURIComponent(clientId)}`));
 
       eventSource.addEventListener('connected', () => {
         retryCount = 0;

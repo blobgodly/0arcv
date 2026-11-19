@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useArchive } from '../../context/ArchiveContext';
+import { getApiUrl } from '../../utils/apiConfig';
 import {
   ImagePlus,
   Search,
@@ -69,7 +70,7 @@ const imageToCloud = async (image: StoredImage) => ({
 
 export const readImages = async (): Promise<StoredImage[]> => {
   try {
-    const response = await fetch('/api/cloud/images');
+    const response = await fetch(getApiUrl('/api/cloud/images'));
     if (response.ok) {
       const payload = await response.json();
       if (payload.ok && Array.isArray(payload.images)) {
@@ -88,7 +89,7 @@ export const readImages = async (): Promise<StoredImage[]> => {
 
 export const writeImages = async (images: StoredImage[]) => {
   try {
-    const response = await fetch('/api/cloud/images', {
+    const response = await fetch(getApiUrl('/api/cloud/images'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ images: await Promise.all(images.map(imageToCloud)) }),
     });
@@ -101,7 +102,7 @@ export const writeImages = async (images: StoredImage[]) => {
 
 export const removeImage = async (id: string) => {
   try {
-    const response = await fetch(`/api/cloud/images/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const response = await fetch(getApiUrl(`/api/cloud/images/${encodeURIComponent(id)}`), { method: 'DELETE' });
     if (response.ok) return;
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : 'MongoDB image storage unavailable');

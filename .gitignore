@@ -7,3 +7,8 @@ coverage/
 .env*
 !.env.example
 .vercel
+*.ipa
+target/
+rust-server/target/
+ios/App/Pods/
+ios/App/build/

@@ -1,0 +1,119 @@
+name: Build Unsigned iOS IPA
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: 'Optional default Cloud/MongoDB Server URL (e.g. https://your-server.railway.app)'
+        required: false
+        default: ''
+
+jobs:
+  build-ipa:
+    name: Build Unsigned iOS .ipa
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: |
+          npm ci || npm install --legacy-peer-deps
+
+      - name: Build Web Application
+        env:
+          VITE_API_URL: ${{ github.event.inputs.backend_url || secrets.VITE_API_URL || '' }}
+        run: |
+          npm run build
+
+      - name: Setup CocoaPods
+        run: |
+          sudo gem install cocoapods --no-document || true
+
+      - name: Initialize or Sync Capacitor iOS
+        run: |
+          if [ ! -d "ios" ]; then
+            echo "Adding iOS platform via Capacitor..."
+            npx cap add ios
+          else
+            echo "Syncing iOS platform via Capacitor..."
+            npx cap sync ios
+          fi
+
+      - name: Configure iOS ATS & App Properties
+        run: |
+          PLIST="ios/App/App/Info.plist"
+          if [ -f "$PLIST" ]; then
+            echo "Configuring App Transport Security in $PLIST..."
+            /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"
+            
+            # Set display name
+            /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName string '0arc'" "$PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string '0arc'" "$PLIST"
+          fi
+
+      - name: Build iOS App without Code Signing
+        run: |
+          cd ios/App
+          pod install || true
+          
+          echo "Building Xcode workspace..."
+          xcodebuild clean build \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ../../build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            COMPILER_INDEX_STORE_ENABLE=NO
+
+      - name: Package Unsigned .ipa Payload
+        run: |
+          mkdir -p build_ipa/Payload
+          APP_PATH=$(find build/DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d | head -n 1)
+          
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "Error: Could not locate built .app bundle in build/DerivedData"
+            exit 1
+          fi
+          
+          echo "Found built App at: $APP_PATH"
+          cp -R "$APP_PATH" build_ipa/Payload/
+          
+          cd build_ipa
+          zip -r -q ../0arc-unsigned.ipa Payload
+          cd ..
+          
+          echo "Successfully created 0arc-unsigned.ipa"
+          ls -lh 0arc-unsigned.ipa
+
+      - name: Upload Unsigned IPA as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 0arc-unsigned-ipa
+          path: 0arc-unsigned.ipa
+          retention-days: 30
+
+      - name: Publish Release (on Git Tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: 0arc-unsigned.ipa
+          generate_release_notes: true

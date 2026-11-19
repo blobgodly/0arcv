@@ -1,4 +1,5 @@
 import type { MediaType } from '../types';
+import { getApiUrl } from '../utils/apiConfig';
 
 export interface MediaCandidate {
   id: string;
@@ -24,7 +25,7 @@ export interface MediaDetails {
 export async function searchMedia(query: string, type?: MediaType): Promise<MediaCandidate[]> {
   const params = new URLSearchParams({ q: query.trim() });
   if (type) params.set('type', type);
-  const response = await fetch(`/api/imdb/search?${params.toString()}`);
+  const response = await fetch(getApiUrl(`/api/imdb/search?${params.toString()}`));
   const payload = (await response.json().catch(() => null)) as
     | { ok?: boolean; results?: MediaCandidate[]; error?: string }
     | null;
@@ -43,7 +44,7 @@ export async function lookupMediaDetails(input: {
   imdbId?: string;
   posterUrl?: string;
 }): Promise<MediaDetails | null> {
-  const response = await fetch('/api/imdb/details', {
+  const response = await fetch(getApiUrl('/api/imdb/details'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),

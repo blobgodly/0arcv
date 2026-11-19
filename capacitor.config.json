@@ -1,0 +1,15 @@
+{
+  "appId": "com.zeroarc.archive",
+  "appName": "0arc",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "capacitor",
+    "cleartext": true
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile",
+    "scheme": "0arc"
+  }
+}

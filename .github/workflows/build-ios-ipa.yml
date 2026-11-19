@@ -45,12 +45,14 @@ jobs:
 
       - name: Initialize or Sync Capacitor iOS
         run: |
+          echo "=== Capacitor Info ==="
+          npx cap --version
           if [ ! -d "ios" ]; then
-            echo "Adding iOS platform via Capacitor..."
-            npx cap add ios
+            echo "Adding iOS platform via Capacitor (without automatic pod install)..."
+            npx cap add ios --no-pod-install
           fi
-          echo "Syncing iOS platform via Capacitor..."
-          npx cap sync ios
+          echo "Syncing Capacitor plugins and assets..."
+          npx cap sync ios --no-pod-install
 
       - name: Configure iOS ATS & App Properties
         run: |
@@ -66,11 +68,14 @@ jobs:
             /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string '0arc'" "$PLIST"
           fi
 
+      - name: Install CocoaPods Dependencies
+        run: |
+          cd ios/App
+          pod install --repo-update || pod install
+
       - name: Build iOS App without Code Signing
         run: |
           cd ios/App
-          pod install || true
-          
           echo "Building Xcode workspace..."
           xcodebuild clean build \
             -workspace App.xcworkspace \

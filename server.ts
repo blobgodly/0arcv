@@ -7,6 +7,8 @@
  * - Development Vite middleware & Production static serving
  */
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { lookupMedia, resolveMediaDetails, searchImdb, type MediaKind } from './api/_lib/media.ts';
@@ -333,17 +335,23 @@ app.all('/api/supabase/*', async (req, res) => {
 // -------------------------------------------------------------
 
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.resolve(process.cwd(), 'dist');
+  const indexPath = path.join(distPath, 'index.html');
+
+  if (fs.existsSync(indexPath)) {
+    console.log(`[0arc] Serving static production build from ${distPath}`);
+    app.use(express.static(distPath));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      res.sendFile(indexPath);
+    });
+  } else if (process.env.NODE_ENV !== 'production') {
+    console.log('[0arc] Starting Vite dev middleware...');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
-    app.use(express.static('dist'));
-    app.get('*', (_req, res) => {
-      res.sendFile('dist/index.html', { root: '.' });
-    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {

@@ -48,8 +48,8 @@ jobs:
           echo "=== Capacitor Info ==="
           npx cap --version || true
           if [ ! -d "ios" ]; then
-            echo "Adding iOS platform via Capacitor (Swift Package Manager / native)..."
-            npx cap add ios --packagemanager SPM || npx cap add ios
+            echo "Adding iOS platform via Capacitor..."
+            npx cap add ios
           fi
           echo "Syncing Capacitor plugins and assets..."
           npx cap sync ios
@@ -72,18 +72,17 @@ jobs:
         run: |
           cd ios/App
           
-          # If Podfile is present, ensure pods are resolved
-          if [ -f "Podfile" ]; then
-            echo "Podfile found. Running CocoaPods install..."
-            pod install --repo-update || pod install || true
+          # Only run pod install if workspace was not already created by Capacitor
+          if [ ! -d "App.xcworkspace" ] && [ -f "Podfile" ]; then
+            echo "Installing CocoaPods..."
+            pod install || true
           fi
 
-          # Select workspace if CocoaPods was used, otherwise project for SPM
           if [ -d "App.xcworkspace" ]; then
             echo "Building with Xcode Workspace..."
             TARGET_FLAG="-workspace App.xcworkspace"
           else
-            echo "Building with Xcode Project (Swift Package Manager)..."
+            echo "Building with Xcode Project..."
             TARGET_FLAG="-project App.xcodeproj"
           fi
 

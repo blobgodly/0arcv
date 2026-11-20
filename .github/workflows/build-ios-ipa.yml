@@ -71,7 +71,7 @@ jobs:
           name: capacitor-failure-logs
           path: /tmp/cap_*.log
 
-      - name: Configure iOS ATS & App Properties
+      - name: Configure iOS ATS & Podfile Settings
         run: |
           PLIST="ios/App/App/Info.plist"
           if [ -f "$PLIST" ]; then
@@ -85,16 +85,30 @@ jobs:
             /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string '0arc'" "$PLIST"
           fi
 
+          PODFILE="ios/App/Podfile"
+          if [ -f "$PODFILE" ]; then
+            echo "Configuring Podfile post-install hooks for unsigned build..."
+            cat << 'EOF' >> "$PODFILE"
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
+      config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
+      config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = "NO"
+    end
+  end
+end
+EOF
+            cd ios/App
+            pod install
+          fi
+
       - name: Build iOS App without Code Signing
         run: |
           cd ios/App
           
-          # Only run pod install if workspace was not already created by Capacitor
-          if [ ! -d "App.xcworkspace" ] && [ -f "Podfile" ]; then
-            echo "Installing CocoaPods..."
-            pod install || true
-          fi
-
           if [ -d "App.xcworkspace" ]; then
             echo "Building with Xcode Workspace..."
             TARGET_FLAG="-workspace App.xcworkspace"
@@ -103,20 +117,24 @@ jobs:
             TARGET_FLAG="-project App.xcodeproj"
           fi
 
-          echo "Running xcodebuild..."
+          echo "Running xcodebuild with ad-hoc signing..."
           xcodebuild clean build \
             $TARGET_FLAG \
             -scheme App \
             -configuration Release \
-            -destination 'generic/platform=iOS' \
+            -sdk iphoneos \
             -derivedDataPath ../../build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_ALLOWED=YES \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
             DEVELOPMENT_TEAM="" \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO 2>&1 | tee /tmp/xcodebuild.log || {
+              ERROR_MSG=$(tail -n 20 /tmp/xcodebuild.log | tr '\n' ' ')
+              echo "::error title=Xcodebuild Failed::$ERROR_MSG"
+              exit 1
+            }
 
       - name: Package Unsigned .ipa Payload
         run: |

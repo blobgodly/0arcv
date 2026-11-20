@@ -115,17 +115,17 @@ jobs:
             TARGET_FLAG="-project App.xcodeproj"
           fi
 
-          echo "Running xcodebuild with ad-hoc signing..."
+          echo "Running xcodebuild for unsigned build..."
           xcodebuild clean build \
             $TARGET_FLAG \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath ../../build/DerivedData \
-            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=YES \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
             COMPILER_INDEX_STORE_ENABLE=NO 2>&1 | tee /tmp/xcodebuild.log || {

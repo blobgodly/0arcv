@@ -71,7 +71,7 @@ jobs:
           name: build-failure-logs
           path: /tmp/*.log
 
-      - name: Configure iOS ATS & Podfile Settings
+      - name: Configure iOS ATS & App Properties
         run: |
           PLIST="ios/App/App/Info.plist"
           if [ -f "$PLIST" ]; then
@@ -85,51 +85,21 @@ jobs:
             /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string '0arc'" "$PLIST"
           fi
 
-          PODFILE="ios/App/Podfile"
-          if [ -f "$PODFILE" ]; then
-            echo "Configuring Podfile post-install hooks for unsigned build..."
-            echo "" >> "$PODFILE"
-            echo "post_install do |installer|" >> "$PODFILE"
-            echo "  installer.pods_project.targets.each do |target|" >> "$PODFILE"
-            echo "    target.build_configurations.each do |config|" >> "$PODFILE"
-            echo "      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''" >> "$PODFILE"
-            echo "      config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'" >> "$PODFILE"
-            echo "      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'" >> "$PODFILE"
-            echo "      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'" >> "$PODFILE"
-            echo "    end" >> "$PODFILE"
-            echo "  end" >> "$PODFILE"
-            echo "end" >> "$PODFILE"
-            cd ios/App
-            pod install
-          fi
-
-      - name: Build iOS App without Code Signing
+      - name: Build Xcode Project (Unsigned)
         run: |
           cd ios/App
-          
-          if [ -d "App.xcworkspace" ]; then
-            echo "Building with Xcode Workspace..."
-            TARGET_FLAG="-workspace App.xcworkspace"
-          else
-            echo "Building with Xcode Project..."
-            TARGET_FLAG="-project App.xcodeproj"
-          fi
-
-          echo "Running xcodebuild for unsigned build..."
-          xcodebuild clean build \
-            $TARGET_FLAG \
+          echo "Building iOS App via xcodebuild..."
+          xcodebuild -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath ../../build/DerivedData \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
+            -derivedDataPath build \
             CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO 2>&1 | tee /tmp/xcodebuild.log || {
+            build 2>&1 | tee /tmp/xcodebuild.log || {
               echo "### ❌ Xcodebuild Output" >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
               tail -n 40 /tmp/xcodebuild.log >> $GITHUB_STEP_SUMMARY
@@ -140,10 +110,13 @@ jobs:
       - name: Package Unsigned .ipa Payload
         run: |
           mkdir -p build_ipa/Payload
-          APP_PATH=$(find build/DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d | head -n 1)
+          APP_PATH=$(find ios/App/build -name "*.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d | head -n 1)
+          fi
           
           if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-            echo "Error: Could not locate built .app bundle in build/DerivedData"
+            echo "Error: Could not locate built .app bundle"
             exit 1
           fi
           

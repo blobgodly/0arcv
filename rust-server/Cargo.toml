@@ -37,7 +37,7 @@ uuid = { version = "1.11", features = ["v4", "serde"] }
 
 [profile.release]
 opt-level = 3
-lto = true
-codegen-units = 1
+lto = false
+codegen-units = 16
 panic = "abort"
 strip = true

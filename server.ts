@@ -41,6 +41,10 @@ app.use((_req, res, next) => {
   next();
 });
 
+app.get('/api/health', (_req, res) => {
+  return res.json({ ok: true, status: 'healthy', timestamp: new Date().toISOString() });
+});
+
 app.post('/api/auth/login', (req, res) => {
   if (!allowLoginAttempt(req.ip || 'unknown')) return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
   const password = typeof req.body?.password === 'string' && req.body.password.length <= 1024 ? req.body.password : '';

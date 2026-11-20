@@ -26,6 +26,8 @@ pub fn create_router(state: AppState) -> Router {
         .allow_headers(Any);
 
     let api_routes = Router::new()
+        // Health
+        .route("/api/health", get(|| async { Json(json!({ "ok": true, "status": "healthy" })) }))
         // Auth
         .route("/api/auth/login", post(auth_routes::login_handler))
         .route("/api/auth/logout", post(auth_routes::logout_handler))
@@ -67,8 +69,8 @@ async fn auth_middleware(
 ) -> Response {
     let path = req.uri().path();
 
-    // Skip auth check if authentication is not required or on login/logout paths
-    if !state.auth.requires_auth() || path.starts_with("/api/auth/") {
+    // Skip auth check if authentication is not required or on login/logout/health paths
+    if !state.auth.requires_auth() || path.starts_with("/api/auth/") || path == "/api/health" {
         return next.run(req).await;
     }
 

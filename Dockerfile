@@ -3,20 +3,18 @@
 # --- Stage 1: Build Frontend ---
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+COPY package*.json .npmrc* ./
+RUN npm install --legacy-peer-deps
 COPY . .
 RUN npm run build
 
 # --- Stage 2: Build Rust Backend ---
 FROM rust:1.85-alpine AS backend-builder
-RUN apk add --no-cache musl-dev
+RUN apk add --no-cache musl-dev gcc libc-dev
 WORKDIR /app
 COPY rust-server/Cargo.toml rust-server/
+COPY rust-server/src rust-server/src
 WORKDIR /app/rust-server
-# Dummy build to cache dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release && rm -rf src
-COPY rust-server/src ./src
 RUN cargo build --release
 
 # --- Stage 3: Minimal Runtime ---
